@@ -1,17 +1,1104 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>dsc-tools</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.6; }
-    code { background: #f3f3f3; padding: .1em .3em; border-radius: 3px; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DSC Panel Grid — .tad をドロップしてパネル図にする</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#161A21; --mut:#6B7686; --rule:#DCE1E8; --ground:#F6F7F9; --surf:#FFFFFF;
+  --accent:#2F6FB5; --warn:#C2681C; --panel:#FFFFFF;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#E7EBF0; --mut:#828D9C; --rule:#272D35; --ground:#101317; --surf:#15181C;
+    --accent:#4E90D6; --warn:#C57F3E; --panel:#FFFFFF;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#E7EBF0; --mut:#828D9C; --rule:#272D35; --ground:#101317; --surf:#15181C;
+  --accent:#4E90D6; --warn:#C57F3E; --panel:#FFFFFF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ground);color:var(--ink);font-family:'Noto Sans JP',system-ui,sans-serif;
+     font-weight:300;font-size:14px;line-height:1.6;min-height:100vh}
+.mono{font-family:'IBM Plex Mono',monospace}
+.wrap{display:flex;min-height:100vh;flex-wrap:wrap}
+
+/* ── sidebar ─────────────────────────────────────────── */
+.side{width:300px;flex-shrink:0;background:var(--surf);border-right:1px solid var(--rule);
+      padding:20px 18px 60px;overflow-y:auto;max-height:100vh;position:sticky;top:0}
+.side h1{font-size:16px;font-weight:500;line-height:1.3;margin-bottom:3px}
+.side .sub{font-size:11.5px;color:var(--mut);margin-bottom:18px}
+.grp{border-top:1px solid var(--rule);padding-top:14px;margin-top:16px}
+.grp h2{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--mut);margin-bottom:10px}
+label.row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+          font-size:12.5px;margin-bottom:8px;color:var(--ink)}
+label.row span{color:var(--mut)}
+input[type=number],input[type=text],select{
+  font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--ground);
+  color:var(--ink);border:1px solid var(--rule);border-radius:4px;padding:4px 6px;width:88px}
+select{width:100%}
+input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+.btn{font-family:'Noto Sans JP',sans-serif;font-size:12.5px;background:var(--ground);
+     color:var(--ink);border:1px solid var(--rule);border-radius:5px;padding:6px 10px;
+     cursor:pointer;transition:background .12s}
+.btn:hover{background:var(--rule)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{opacity:.88}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap}
+.drop{border:1.5px dashed var(--rule);border-radius:8px;padding:22px 14px;text-align:center;
+      font-size:12.5px;color:var(--mut);cursor:pointer;transition:all .15s}
+.drop:hover,.drop.over{border-color:var(--accent);color:var(--accent);background:var(--ground)}
+.files{margin-top:12px;display:flex;flex-direction:column;gap:5px}
+.fitem{display:flex;align-items:center;gap:7px;background:var(--ground);border:1px solid var(--rule);
+       border-radius:5px;padding:6px 8px;font-size:11.5px;cursor:grab}
+.fitem.drag{opacity:.4}
+.fitem .hd{color:var(--mut);font-family:'IBM Plex Mono',monospace;font-size:10px;flex-shrink:0}
+.fitem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fitem .nm input{width:100%;background:transparent;border:none;padding:0;font-size:11.5px;
+                 font-family:'Noto Sans JP',sans-serif;color:var(--ink)}
+.fitem .x{color:var(--mut);cursor:pointer;flex-shrink:0;padding:0 2px}
+.fitem .x:hover{color:var(--warn)}
+
+/* ── main ────────────────────────────────────────────── */
+.main{flex:1;min-width:0;padding:24px 26px 80px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+     margin-bottom:16px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{font-size:12.5px;padding:6px 12px;border:1px solid var(--rule);border-radius:999px;
+     background:var(--surf);color:var(--mut);cursor:pointer;white-space:nowrap}
+.tab.on{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.stage{background:var(--surf);border:1px solid var(--rule);border-radius:8px;padding:14px;
+       overflow-x:auto}
+#svgHost svg{display:block;max-width:100%;height:auto}
+.empty{color:var(--mut);font-size:13px;text-align:center;padding:80px 20px}
+.note{font-size:12px;color:var(--mut);margin-top:12px}
+table.tbl{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px}
+table.tbl th,table.tbl td{padding:5px 8px;border-bottom:1px solid var(--rule);text-align:left;
+                          white-space:nowrap}
+table.tbl th{font-size:10.5px;color:var(--mut);font-weight:500;letter-spacing:.04em}
+table.tbl td{font-family:'IBM Plex Mono',monospace}
+.scroll{overflow-x:auto;background:var(--surf);border:1px solid var(--rule);border-radius:8px;
+        padding:4px 12px 12px;margin-top:14px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);
+       color:var(--ground);padding:9px 16px;border-radius:6px;font-size:12.5px;opacity:0;
+       pointer-events:none;transition:opacity .2s;z-index:50;max-width:80vw}
+.toast.on{opacity:1}
+@media (max-width:820px){
+  .side{width:100%;max-height:none;position:static;border-right:none;border-bottom:1px solid var(--rule)}
+  .main{padding:18px 14px 60px}
+}
+/* ── manual ──────────────────────────────────────────── */
+.ovl{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:60;
+     padding:24px;overflow-y:auto}
+.ovl.on{display:block}
+.man{max-width:820px;margin:0 auto;background:var(--surf);border:1px solid var(--rule);
+     border-radius:10px;padding:32px 34px 44px;position:relative}
+.man h2{font-size:20px;font-weight:500;margin:0 0 4px}
+.man .lede{font-size:12.5px;color:var(--mut);margin-bottom:22px}
+.man h3{font-size:14.5px;font-weight:500;margin:26px 0 8px;padding-bottom:6px;
+        border-bottom:1px solid var(--rule)}
+.man p{font-size:13px;margin-bottom:9px}
+.man ul,.man ol{font-size:13px;margin:0 0 10px 20px}
+.man li{margin-bottom:6px}
+.man code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--ground);
+          border:1px solid var(--rule);border-radius:3px;padding:1px 5px}
+.man table{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0 12px}
+.man th,.man td{padding:6px 8px;border-bottom:1px solid var(--rule);text-align:left;
+                vertical-align:top}
+.man th{font-size:11px;color:var(--mut);font-weight:500;white-space:nowrap}
+.man .warn{background:var(--ground);border:1px solid var(--rule);border-left:3px solid var(--warn);
+           border-radius:5px;padding:12px 15px;font-size:12.5px;margin:12px 0}
+.man .close{position:absolute;top:16px;right:18px;font-size:13px;color:var(--mut);
+            cursor:pointer;border:1px solid var(--rule);border-radius:5px;padding:4px 10px;
+            background:var(--ground)}
+.man .close:hover{color:var(--ink)}
+</style>
 </head>
 <body>
-  <h1>dsc-tools</h1>
-  <p>GitHub Pages は動作しています。このページはプレースホルダーです。</p>
-  <p><code>dsc-panel-grid.html</code> を <code>index.html</code> として置き換えると、この画面が DSC パネルグリッドに差し替わります。</p>
+<div class="wrap">
+
+<aside class="side">
+  <h1>DSC Panel Grid</h1>
+  <p class="sub">島津 .tad / .txt、PerkinElmer .txt をドロップ → パネル図 → SVG・PNG・CSV</p>
+
+  <div class="drop" id="drop">
+    ファイルをドロップ<br><span style="font-size:11px">またはクリックして選択</span>
+    <input type="file" id="fileIn" accept=".tad,.txt,.csv" multiple hidden>
+  </div>
+  <div class="files" id="fileList"></div>
+
+  <div class="grp">
+    <h2>レイアウト</h2>
+    <label class="row"><span>列数</span><input type="number" id="cols" value="3" min="1" max="6"></label>
+    <label class="row"><span>パネル幅 px</span><input type="number" id="pw" value="420" min="200" max="900" step="10"></label>
+    <label class="row"><span>パネル高 px</span><input type="number" id="ph" value="280" min="150" max="700" step="10"></label>
+    <label class="row"><span>タイトル</span><input type="text" id="title" value="" placeholder="図の見出し"></label>
+  </div>
+
+  <div class="grp">
+    <h2>信号</h2>
+    <label class="row"><span>質量で規格化 W/g</span><input type="checkbox" id="norm" checked></label>
+    <label class="row"><span>吸熱を上向きに</span><input type="checkbox" id="endoUp" checked></label>
+    <label class="row"><span>平滑化 点数</span><input type="number" id="smooth" value="1" min="1" max="99" step="2"></label>
+  </div>
+
+  <div class="grp">
+    <h2>セグメント判定</h2>
+    <label class="row"><span>|dT/dt| 閾値</span><input type="number" id="rateThr" value="0.35" min="0.02" max="5" step="0.05"></label>
+    <label class="row"><span>最短 min</span><input type="number" id="minDur" value="0.8" min="0.1" max="10" step="0.1"></label>
+    <label class="row"><span>端の除外 min</span><input type="number" id="trim" value="0.4" min="0" max="5" step="0.1"></label>
+    <label class="row"><span>色/段の基準</span>
+      <select id="anchor"><option value="end">末尾から揃える</option><option value="start">先頭から揃える</option></select></label>
+  </div>
+
+  <div class="grp">
+    <h2>軸</h2>
+    <label class="row"><span>X 自動</span><input type="checkbox" id="xAuto" checked></label>
+    <label class="row"><span>X 最小</span><input type="number" id="xMin" value="" step="1"></label>
+    <label class="row"><span>X 最大</span><input type="number" id="xMax" value="" step="1"></label>
+    <label class="row"><span>Y 自動</span><input type="checkbox" id="yAuto" checked></label>
+    <label class="row"><span>Y 最小</span><input type="number" id="yMin" value="" step="0.1"></label>
+    <label class="row"><span>Y 最大</span><input type="number" id="yMax" value="" step="0.1"></label>
+    <label class="row"><span>基準線 °C</span><input type="text" id="vline" value="" placeholder="例 33.5"></label>
+  </div>
+
+  <div class="grp">
+    <h2>表示</h2>
+    <label class="row"><span>ステップ番号</span><input type="checkbox" id="showLab" checked></label>
+    <label class="row"><span>走査方向の矢印</span><input type="checkbox" id="showArr" checked></label>
+    <label class="row"><span>保持区間も描く</span><input type="checkbox" id="showHold" checked></label>
+    <label class="row"><span>試料量を表示</span><input type="checkbox" id="showMass" checked></label>
+    <label class="row"><span>ゼロ線</span><input type="checkbox" id="showZero" checked></label>
+  </div>
+
+  <div class="grp">
+    <h2>書き出し</h2>
+    <div class="btnrow">
+      <button class="btn pri" id="expSvg">SVG</button>
+      <button class="btn" id="expPng">PNG</button>
+      <button class="btn" id="expCsvSeg">CSV 台帳</button>
+      <button class="btn" id="expCsvPk">CSV ピーク</button>
+      <button class="btn" id="expCsvData">CSV 波形</button>
+    </div>
+    <p style="font-size:11px;color:var(--mut);margin-top:8px">ΔH は直線ベースラインの自動積分です。傾向の比較には使えますが、論文に引く数値ではありません。</p>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="bar">
+    <div class="tabs" id="tabs"></div>
+    <button class="btn" id="manBtn">使い方</button>
+    <button class="btn" id="themeBtn">表示切替</button>
+  </div>
+  <div class="stage">
+    <div id="svgHost"><p class="empty">左のパネルにファイルをドロップしてください。<br>
+      島津の .tad はそのまま読めます。</p></div>
+  </div>
+  <div id="tableHost"></div>
+</main>
+</div>
+
+<div class="ovl" id="ovl">
+<div class="man">
+  <span class="close" id="manClose">閉じる</span>
+  <h2>DSC Panel Grid の使い方</h2>
+  <p class="lede">島津 .tad と、島津 / PerkinElmer のテキスト書き出しを読み、同じ配列のパネル図にして SVG・PNG・CSV で出します。データはブラウザの中だけで処理され、どこにも送信されません。保存もされないので、閉じると消えます。</p>
+
+  <h3>1. 読み込む</h3>
+  <p>左上の枠にファイルをドロップするか、クリックして選びます。まとめて落として構いません。</p>
+  <ul>
+    <li><b>.tad</b> — 島津 TA-60 のバイナリをその場でデコードします。TA-60 のテキスト書き出しより情報が多く、丸めのないフル精度で読めます。対応は VER2.00 系です。</li>
+    <li><b>.txt</b> — 島津(UTF-16LE の日本語ヘッダ)と PerkinElmer Pyris のどちらも自動判別します。</li>
+    <li>島津は吸熱下向きで記録されているので、読み込み時に反転して PerkinElmer と向きを揃えます。</li>
+  </ul>
+  <p>読み込んだファイルは左のリストに並びます。<b>ドラッグで並べ替え</b>、名前は<b>その場で書き換え</b>られます。ここでの順番と名前が、そのままパネルの並びと見出しになります。</p>
+
+  <h3>2. ビューを選ぶ</h3>
+  <table>
+    <tr><th>タブ</th><th>何が見えるか</th></tr>
+    <tr><td>熱履歴 T vs t</td><td>温度プログラムの実測。設定値に届いているか、どこで折り返したかが分かります。</td></tr>
+    <tr><td>熱流 vs 時間</td><td>全区間の熱流。どの時刻に何が起きたかを追うとき。</td></tr>
+    <tr><td>熱流 vs 温度</td><td>昇温・降温だけを温度軸で。ピーク位置の比較用。</td></tr>
+    <tr><td>熱流 vs 温度(段積み)</td><td>ステップごとに縦にずらして重ならないようにしたもの。発表用。</td></tr>
+    <tr><td>定温保持のみ</td><td>保持区間だけを、保持開始からの経過時間で。等温結晶化や転移を見るとき。</td></tr>
+  </table>
+
+  <h3>3. セグメント判定</h3>
+  <p>温度の時間微分から、昇温 / 降温 / 保持を自動で切り分け、昇降温に <code>1st</code> <code>2nd</code> … と番号を振ります。うまく切れないときはここを触ります。</p>
+  <ul>
+    <li><b>|dT/dt| 閾値</b> — これより速ければ昇降温、遅ければ保持。ゆっくりした昇温(0.5 K/min など)が保持と判定されるなら下げます。</li>
+    <li><b>最短 min</b> — これより短い区間は捨てます。折り返し付近の細切れを消すため。</li>
+    <li><b>端の除外 min</b> — 各区間の頭を何分捨てるか。切り替え直後の装置の過渡応答が乗るので、既定 0.4 分で落としています。熱履歴ビューには効きません。</li>
+    <li><b>色/段の基準</b> — <b>末尾から揃える</b>と、最終降温・最終昇温が全パネルで同じ色・同じ高さになります。ステップ数の違う測定を並べるときはこちら。<b>先頭から揃える</b>は1回目昇温を基準にします。</li>
+  </ul>
+
+  <h3>4. 信号</h3>
+  <ul>
+    <li><b>質量で規格化</b> — ヘッダの試料量で割って W/g にします。面積を比べるなら必須です。質量が読めないファイルは mW のままになります。</li>
+    <li><b>吸熱を上向きに</b> — 外すと装置の生の向きに戻ります。</li>
+    <li><b>平滑化</b> — 移動平均の点数。奇数で。ピーク位置がずれるので、数値を読むときは 1 のままが安全です。</li>
+  </ul>
+
+  <h3>5. 軸とレイアウト</h3>
+  <p>軸範囲は全パネル共通です。自動のチェックを外すと手で決められます。<b>基準線</b>にはカンマ区切りで温度を入れられます(例 <code>33.5, 26</code>)。温度軸のビューにだけ引かれます。</p>
+  <p>列数とパネル寸法で並びが変わります。6測定を 3 列にすれば 2×3 になります。</p>
+
+  <h3>6. 書き出す</h3>
+  <table>
+    <tr><th>ボタン</th><th>中身</th></tr>
+    <tr><td>SVG</td><td>画面と同じベクタ画像。Illustrator で色や文字を直せます。論文用はこちら。</td></tr>
+    <tr><td>PNG</td><td>3倍解像度のビットマップ。スライドや共有用。</td></tr>
+    <tr><td>CSV 台帳</td><td>1行1セグメント。ファイル名・試料・質量・日付・段番号・種別・開始終了温度・速度・長さ。</td></tr>
+    <tr><td>CSV ピーク</td><td>1行1ピーク。方向・T<sub>onset</sub>・T<sub>peak</sub>・T<sub>end</sub>・ΔH。規格化と向きの設定も列に残ります。</td></tr>
+    <tr><td>CSV 波形</td><td>間引いた生波形。時間・温度・熱流をセグメント付きで。</td></tr>
+  </table>
+
+  <h3>数値を引用する前に</h3>
+  <div class="warn">
+    <b>ΔH は直線ベースラインの自動積分です。</b>順位づけと傾向の議論には使えますが、論文に引く数値ではありません。手で積分し直してください。隣接するピークの裾が混ざると 20–30 % 平気でずれます。
+  </div>
+  <div class="warn">
+    <b>温度は補正していません。</b>装置の温度校正がずれていれば、そのずれたまま表示されます。保持中の試料温度が設定値と一致しているかを確認し、必要ならインジウム(156.6 °C)で校正してください。同一測定内での比較(あるピークと別のピークの位置関係)は校正ずれの影響を受けません。
+  </div>
+  <p style="font-size:12.5px;color:var(--mut)">そのほか注意する点。PNG に落とすとき Web フォントは埋め込まれないので、日本語はシステムのフォントに置き換わります。段積みビューの縦軸は目盛りを外し、左上パネルにスケールバーを出しています。ピーク検出は各セグメント内の最大振幅に対する相対閾値で動くので、平坦な区間ではノイズを拾わない代わり、小さな肩は取りこぼします。</p>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   1. パーサ
+   島津 .tad のデコードと両ベンダのテキストパースは DSC Analyzer v10 の
+   実装をそのまま用いています(同一のファイルが同一の行に落ちること)。
+   ═══════════════════════════════════════════════════════════════════════ */
+function decodeDscBytes(buf){
+  const b=new Uint8Array(buf);
+  if(b.length>=2&&b[0]===0xFF&&b[1]===0xFE)return new TextDecoder('utf-16le').decode(b.subarray(2));
+  if(b.length>=2&&b[0]===0xFE&&b[1]===0xFF)return new TextDecoder('utf-16be').decode(b.subarray(2));
+  if(b.length>=3&&b[0]===0xEF&&b[1]===0xBB&&b[2]===0xBF)return new TextDecoder('utf-8').decode(b.subarray(3));
+  return new TextDecoder('utf-8').decode(b);
+}
+const TAD_MAGIC='TA-60 FILE';
+function isTadBuffer(buf){
+  const b=new Uint8Array(buf,0,Math.min(TAD_MAGIC.length,buf.byteLength));
+  return String.fromCharCode.apply(null,b)===TAD_MAGIC;
+}
+function tadFind(u8,ascii,from=0){
+  const pat=[];for(let i=0;i<ascii.length;i++)pat.push(ascii.charCodeAt(i));
+  outer:for(let i=from;i<=u8.length-pat.length;i++){
+    for(let k=0;k<pat.length;k++)if(u8[i+k]!==pat[k])continue outer;
+    return i;
+  }
+  return -1;
+}
+function tadChannels(u8,dv){
+  let i=tadFind(u8,'CTimeData');
+  if(i<0)throw new Error('CTimeData not found');
+  i+='CTimeData'.length;
+  const ch={};
+  for(;;){
+    if(i+16>u8.length)break;
+    const id=dv.getUint16(i,true),n=dv.getInt32(i+2,true),flag=dv.getUint16(i+14,true);
+    if(flag!==2||!(n>0&&n<1e7)||i+16+4*n>u8.length)break;
+    const a=new Float64Array(n);
+    for(let k=0;k<n;k++)a[k]=dv.getFloat32(i+16+4*k,true);
+    ch[id]=a;
+    i+=16+4*n;
+    if(i+2>u8.length)break;
+    const tag=dv.getUint16(i,true);
+    if(tag===0xffff){
+      const len=dv.getUint16(i+4,true);
+      const nm=String.fromCharCode.apply(null,u8.subarray(i+6,i+6+len));
+      if(!/Data$/.test(nm))break;
+      i+=6+len;
+    }else if(tag&0x8000)i+=2;
+    else break;
+  }
+  return ch;
+}
+function tadSteps(u8,dv){
+  let k=tadFind(u8,'CTATempStep');
+  if(k<0)return [];
+  k+='CTATempStep'.length;
+  const steps=[];
+  for(;;){
+    if(k+22>u8.length)break;
+    const rate=dv.getFloat32(k,true),toT=dv.getFloat32(k+4,true),hold=dv.getFloat32(k+8,true);
+    if(!(Math.abs(rate)<1000&&toT>-300&&toT<2000&&hold>=0&&hold<10000))break;
+    steps.push({rate,toT,hold});
+    k+=22;
+    if(k+2>u8.length)break;
+    if(dv.getUint16(k,true)&0x8000)k+=2;else break;
+  }
+  return steps;
+}
+function tadInfo(u8,dv){
+  const lo=tadFind(u8,'CDSCFileInf');
+  const hi=lo<0?-1:tadFind(u8,'CTaDetInf',lo);
+  const S=[];
+  if(lo<0||hi<0)return {s:()=>'',n:0,mass:null,gasFlow:null};
+  for(let i=lo;i<hi-4;){
+    if(u8[i]===0xff&&u8[i+1]===0xfe&&u8[i+2]===0xff){
+      let n=u8[i+3],j=i+4;
+      if(n===0xff){n=dv.getUint16(j,true);j+=2;}
+      if(j+2*n<=hi){
+        let s='';for(let c=0;c<n;c++)s+=String.fromCharCode(dv.getUint16(j+2*c,true));
+        S.push({off:i,s});i=j+2*n;continue;
+      }
+    }
+    i++;
+  }
+  const at=k=>(S[k]?S[k].s:'');
+  const fBefore=k=>(S[k]&&S[k].off>=4)?dv.getFloat32(S[k].off-4,true):null;
+  return {s:at,n:S.length,mass:fBefore(S.length-1),gasFlow:fBefore(S.length-2)};
+}
+function tadToText(buf,fname){
+  const ver=new TextDecoder('ascii').decode(new Uint8Array(buf,0,Math.min(18,buf.byteLength)));
+  if(!/^TA-60 FILE VER2\./.test(ver))throw new Error(`未対応の形式 "${ver.trim()}"`);
+  const u8=new Uint8Array(buf),dv=new DataView(buf);
+  const ch=tadChannels(u8,dv),t=ch[1],T=ch[2],D=ch[4];
+  if(!t||!T||!D)throw new Error('時間 / 温度 / DSC チャネルが見つかりません');
+  const n=Math.min(t.length,T.length,D.length);
+  const P=(ch[3]&&ch[3].length>=n)?ch[3]:null;
+  const inf=tadInfo(u8,dv),s=inf.s;
+  const L=['[ファイル情報]'];
+  const kv=(k,v)=>{if(v!=null&&v!=='')L.push(`${k}：\t${v}`);};
+  kv('ファイル名',s(1)||fname);
+  kv('試料名',s(2));
+  kv('収集日',s(4));
+  kv('収集時間',s(5)?`${s(5)}(${s(6)})`:'');
+  kv('機体番号',s(7));
+  kv('オペレータ名',s(8));
+  kv('雰囲気ガス',s(9));
+  if(inf.gasFlow!=null)kv('ガス流量',`${+inf.gasFlow.toFixed(1)}[ml/min]`);
+  kv('セル',s(inf.n-1));
+  if(inf.mass!=null)kv('試料量',`${inf.mass.toFixed(3)}[mg]`);
+  L.push('','[測定プログラム]','加熱速度\tホールド温度\tホールド時間','[ﾟC/min ]\t[  ﾟC   ]\t[  min  ]');
+  tadSteps(u8,dv).forEach(st=>L.push(`${st.rate.toFixed(2)}\t${st.toT.toFixed(1)}\t${+st.hold.toFixed(1)}`));
+  L.push('','[データ]','Time\tTemp\tDSC'+(P?'\tProgTemp':''),'sec\tﾟC\tmW'+(P?'\tﾟC':''));
+  for(let i=0;i<n;i++)
+    L.push(`${t[i].toFixed(2)}\t${T[i].toFixed(4)}\t${D[i].toFixed(4)}`+(P?`\t${P[i].toFixed(4)}`:''));
+  return L.join('\r\n');
+}
+const SHIMADZU_DATA_RE=/^\s*\[(?:データ|Data)\]\s*$/;
+function isShimadzuText(txt){
+  return SHIMADZU_DATA_RE.test(txt.slice(0,20000).split('\n').map(l=>l.replace(/\r$/,'')).join('\n'))
+      || /^\s*(?:機種名|試料名)\s*[:：]/m.test(txt.slice(0,4000));
+}
+function parseDscRawText(txt,fname=''){
+  return isShimadzuText(txt)?parseShimadzuRawText(txt,fname):parsePyrisRawText(txt,fname);
+}
+function parseShimadzuRawText(txt,fname=''){
+  const lines=txt.replace(/^\uFEFF/,'').split('\n').map(l=>l.replace(/\r$/,''));
+  const meta={},prog=[];let dataStart=-1,inProg=false;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i];
+    if(SHIMADZU_DATA_RE.test(l)){dataStart=i+3;break;}
+    if(/^\s*(?:加熱速度|Heating Rate)/.test(l)){inProg=true;continue;}
+    if(inProg){
+      const c=l.split('\t').map(s=>s.trim());
+      const rate=parseFloat(c[0]),toT=parseFloat(c[1]),hold=parseFloat(c[2]);
+      if(isFinite(rate)&&isFinite(toT)){prog.push({rate:Math.abs(rate),toT,hold:isFinite(hold)?hold:0});continue;}
+      if(/^\[/.test(c[0]||''))continue;
+      inProg=false;
+    }
+    const kv=l.split('\t');
+    if(kv.length>=2){const k=kv[0].trim().replace(/[:：]\s*$/,'');const v=kv.slice(1).join('\t').trim();
+      if(k&&v&&!(k in meta))meta[k]=v;}
+  }
+  if(dataStart<0||dataStart>=lines.length)return null;
+  const names=(lines[dataStart-2]||'').split('\t').map(s=>s.trim());
+  const units=(lines[dataStart-1]||'').split('\t').map(s=>s.trim());
+  const colOf=(re,dflt)=>{const i=names.findIndex(t=>re.test(t));return i>=0?i:dflt;};
+  const cTime=colOf(/^time/i,0),cTemp=colOf(/^temp/i,1),cHf=colOf(/^dsc/i,2);
+  const timeInMin=/min/i.test(units[cTime]||'');
+  const rows=[];
+  for(let i=dataStart;i<lines.length;i++){
+    const c=lines[i].split('\t');if(c.length<3)continue;
+    const t=parseFloat(c[cTime]),T=parseFloat(c[cTemp]),d=parseFloat(c[cHf]);
+    if(!isFinite(t)||!isFinite(T)||!isFinite(d))continue;
+    rows.push({time:timeInMin?t:t/60,temp:T,hf:-d});   // 島津は吸熱下向き → 反転
+  }
+  if(!rows.length)return null;
+  const methodSteps=[];let cur=rows[0].temp,num=0;
+  for(const p of prog){
+    if(p.rate>0&&isFinite(p.toT)&&Math.abs(p.toT-cur)>0.5){
+      methodSteps.push({num:++num,type:p.toT>cur?'heating':'cooling',fromT:cur,toT:p.toT,rate:p.rate});
+      cur=p.toT;
+    }
+    if(p.hold>0)methodSteps.push({num:++num,type:'isothermal',fromT:cur,toT:cur,rate:0,duration:p.hold});
+  }
+  return {meta,methodSteps,rows,vendor:'shimadzu'};
+}
+function parsePyrisRawText(txt,fname=''){
+  const lines=txt.split('\n');const meta={};const methodSteps=[];let dataStart=-1;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i];
+    if(/^\s*Time\s+Unsubtracted/i.test(l)){dataStart=i+2;break;}
+    const kv=l.split('\t');
+    if(kv.length>=2){const k=kv[0].trim().replace(/:$/,'');const v=kv.slice(1).join('\t').trim();
+      if(k&&v&&!(k in meta))meta[k]=v;}
+    const sm=l.match(/^(\d+)\)\s*(Cool|Heat)\s+from\s+([-\d.]+).C\s+to\s+([-\d.]+).C\s+at\s+([\d.]+).C\/min/i);
+    if(sm)methodSteps.push({num:+sm[1],type:sm[2].toLowerCase()==='heat'?'heating':'cooling',
+                            fromT:+sm[3],toT:+sm[4],rate:+sm[5]});
+    const hm=l.match(/^(\d+)\)\s*Hold\s+for\s+([\d.]+)\s*min\s+at\s+([-\d.]+).C/i);
+    if(hm)methodSteps.push({num:+hm[1],type:'isothermal',fromT:+hm[3],toT:+hm[3],rate:0,duration:+hm[2]});
+  }
+  if(dataStart<0)return null;
+  const h1=(lines[dataStart-2]||'').split('\t'), h2=(lines[dataStart-1]||'').split('\t');
+  const rawNames=h1.map((t,i)=>(String(t||'').trim()+' '+String(h2[i]||'').trim()).trim());
+  let lead=0;while(lead<rawNames.length&&rawNames[lead]==='')lead++;
+  const names=rawNames.slice(lead);
+  const cTemp=(()=>{const i=names.findIndex(t=>/sample\s*temp/i.test(t));return i>=0?i:4;})();
+  const cHf=(()=>{const i=names.findIndex(t=>/uncorrected\s*heat\s*flow/i.test(t));return i>=0?i:7;})();
+  const rows=[];
+  for(let i=dataStart;i<lines.length;i++){
+    const c=lines[i].trim().split(/\t/);if(c.length<5)continue;
+    const n=c.map(v=>parseFloat(v.trim()));if(n.slice(0,5).some(isNaN)||isNaN(n[cTemp]))continue;
+    let hf=n[cHf];if(isNaN(hf))hf=n[1];
+    rows.push({time:n[0],temp:n[cTemp],hf});
+  }
+  if(!rows.length)return null;
+  return {meta,methodSteps,rows,vendor:'pyris'};
+}
+function massOf(meta){
+  for(const k of ['試料量','Sample Weight','試料重量']){
+    if(meta[k]!=null){const v=parseFloat(String(meta[k]).replace(/[^\d.+-].*$/,''));if(isFinite(v)&&v>0)return v;}
+  }
+  return null;
+}
+function sampleOf(meta){
+  return meta['試料名']||meta['Sample ID']||meta['Sample Name']||'';
+}
+function dateOf(meta){
+  if(meta['収集日'])return (meta['収集日']+' '+(meta['収集時間']||'')).trim();
+  return meta['Data Collected']||'';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   2. セグメント分割・ピーク検出
+   ═══════════════════════════════════════════════════════════════════════ */
+const S=()=>({
+  cols:+g('cols').value||3, pw:+g('pw').value||420, ph:+g('ph').value||280,
+  title:g('title').value.trim(),
+  norm:g('norm').checked, endoUp:g('endoUp').checked, smooth:Math.max(1,+g('smooth').value||1),
+  rateThr:+g('rateThr').value||0.35, minDur:+g('minDur').value||0.8, trim:+g('trim').value||0,
+  anchor:g('anchor').value,
+  xAuto:g('xAuto').checked, xMin:num('xMin'), xMax:num('xMax'),
+  yAuto:g('yAuto').checked, yMin:num('yMin'), yMax:num('yMax'),
+  vline:g('vline').value.split(/[,\s]+/).map(parseFloat).filter(isFinite),
+  showLab:g('showLab').checked, showArr:g('showArr').checked, showHold:g('showHold').checked,
+  showMass:g('showMass').checked, showZero:g('showZero').checked
+});
+function g(id){return document.getElementById(id);}
+function num(id){const v=parseFloat(g(id).value);return isFinite(v)?v:null;}
+
+function movavg(a,w){
+  if(w<=1)return a;
+  const h=Math.floor(w/2),o=new Float64Array(a.length);
+  let s=0,n=0;
+  for(let i=0;i<a.length;i++){
+    if(i===0){for(let k=0;k<=h&&k<a.length;k++){s+=a[k];n++;}}
+    else{
+      const add=i+h,rem=i-h-1;
+      if(add<a.length){s+=a[add];n++;}
+      if(rem>=0){s-=a[rem];n--;}
+    }
+    o[i]=s/n;
+  }
+  return o;
+}
+/** 温度プロファイルを昇温 / 降温 / 保持に切る */
+function segment(t,T,thr,minDur){
+  const Ts=movavg(T,41);
+  const d=new Float64Array(t.length);
+  for(let i=0;i<t.length;i++){
+    const a=Math.max(0,i-8),b=Math.min(t.length-1,i+8);
+    d[i]=(t[b]-t[a])>0?(Ts[b]-Ts[a])/(t[b]-t[a]):0;
+  }
+  let lab=new Int8Array(t.length);
+  for(let i=0;i<t.length;i++)lab[i]=d[i]>thr?1:(d[i]<-thr?-1:0);
+  const sm=movavg(Array.from(lab),61);
+  for(let i=0;i<t.length;i++)lab[i]=Math.round(sm[i]);
+  const out=[];let s0=0;
+  for(let i=1;i<lab.length;i++){
+    if(lab[i]!==lab[s0]){
+      if(t[i-1]-t[s0]>minDur)out.push({i0:s0,i1:i-1,kind:lab[s0]});
+      s0=i;
+    }
+  }
+  if(t[t.length-1]-t[s0]>minDur)out.push({i0:s0,i1:t.length-1,kind:lab[s0]});
+  // 番号付け
+  let rn=0,hn=0;
+  for(const s of out){
+    if(s.kind===0){s.holdIdx=hn++;s.label='';}
+    else{s.rampIdx=rn++;s.label=ordinal(s.rampIdx+1);}
+    s.t0=t[s.i0];s.t1=t[s.i1];s.T0=T[s.i0];s.T1=T[s.i1];
+    s.rate=(s.t1-s.t0)>0?(s.T1-s.T0)/(s.t1-s.t0):0;
+  }
+  const nRamp=rn;
+  for(const s of out)if(s.kind!==0)s.fromEnd=nRamp-1-s.rampIdx;
+  return {segs:out,nRamp};
+}
+function ordinal(n){
+  const s=['th','st','nd','rd'],v=n%100;
+  return n+(s[(v-20)%10]||s[v]||s[0]);
+}
+/** 直線ベースラインからのずれでピークを拾う。ΔH は J/g(規格化時)*/
+function peaks(t,T,y,opt){
+  const n=t.length;if(n<40)return [];
+  // MAD トリムの直線ベースライン
+  let idx=Array.from({length:n},(_,i)=>i);
+  let a=0,b=0;
+  for(let it=0;it<6;it++){
+    let sx=0,sy=0,sxx=0,sxy=0;
+    for(const i of idx){sx+=t[i];sy+=y[i];sxx+=t[i]*t[i];sxy+=t[i]*y[i];}
+    const m=idx.length,den=m*sxx-sx*sx;
+    if(!den)break;
+    a=(m*sxy-sx*sy)/den;b=(sy-a*sx)/m;
+    const r=idx.map(i=>y[i]-(a*t[i]+b));
+    const med=median(r),mad=median(r.map(v=>Math.abs(v-med)))||1e-12;
+    const keep=[];for(let k=0;k<idx.length;k++)if(Math.abs(r[k]-med)<3*mad)keep.push(idx[k]);
+    if(keep.length<20)break;
+    idx=keep;
+  }
+  const dev=new Float64Array(n);
+  let maxAbs=0;
+  for(let i=0;i<n;i++){dev[i]=y[i]-(a*t[i]+b);maxAbs=Math.max(maxAbs,Math.abs(dev[i]));}
+  const out=[];
+  const edge=Math.floor(n*0.02);
+  for(const sgn of [1,-1]){
+    const s=Array.from(dev,v=>v*sgn);
+    const thr=(opt.minFrac||0.06)*maxAbs;
+    let i=1;
+    while(i<n-1){
+      if(s[i]>=s[i-1]&&s[i]>s[i+1]&&s[i]>thr){
+        let lo=i;while(lo>0&&s[lo]>0.01*s[i])lo--;
+        let hi=i;while(hi<n-1&&s[hi]>0.01*s[i])hi++;
+        if(i>edge&&i<n-edge){
+          let dH=0;
+          for(let k=lo;k<hi;k++)dH+=(s[k]+s[k+1])/2*(t[k+1]-t[k]);
+          dH*=60;                       // (W/g)·min → J/g   (規格化していなければ mW·min)
+          if(Math.abs(dH)>(opt.minDH||0.4))
+            out.push({dir:sgn>0?'endo':'exo',Tpeak:T[i],Tonset:T[lo],Tend:T[hi],
+                      tpeak:t[i],dH:dH,amp:s[i]});
+        }
+        i=hi;
+      }else i++;
+    }
+  }
+  out.sort((p,q)=>Math.abs(q.dH)-Math.abs(p.dH));
+  return out.slice(0,4);
+}
+function median(a){const b=Array.from(a).sort((x,y)=>x-y);const m=b.length>>1;
+  return b.length%2?b[m]:(b[m-1]+b[m])/2;}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   3. 状態
+   ═══════════════════════════════════════════════════════════════════════ */
+const FILES=[];           // {id,name,label,meta,rows,t,T,hf,mass,seg}
+let VIEW='hist';
+const VIEWS=[
+  ['hist','熱履歴 T vs t'],
+  ['hft','熱流 vs 時間'],
+  ['hfT','熱流 vs 温度'],
+  ['hfTo','熱流 vs 温度(段積み)'],
+  ['hold','定温保持のみ']
+];
+const PAL=['#C4701F','#3D86C6','#8E6FC0','#8FB6E0','#E0A05A','#2E8B74','#B5527E','#5A6570'];
+const HOLDC='#B9C0C9';
+const INK='#161A21',MUT='#6B7686',RULE='#DCE1E8';
+
+function colorOf(seg,f,st){
+  const i=st.anchor==='end'?seg.fromEnd:seg.rampIdx;
+  return PAL[i%PAL.length];
+}
+function prep(f,st){
+  const n=f.rows.length;
+  const t=new Float64Array(n),T=new Float64Array(n);let hf=new Float64Array(n);
+  const sign=st.endoUp?1:-1;
+  const div=(st.norm&&f.mass)?f.mass:1;
+  for(let i=0;i<n;i++){t[i]=f.rows[i].time;T[i]=f.rows[i].temp;hf[i]=sign*f.rows[i].hf/div;}
+  if(st.smooth>1)hf=movavg(hf,st.smooth);
+  f.t=t;f.T=T;f.hf=hf;
+  const r=segment(t,T,st.rateThr,st.minDur);
+  f.segs=r.segs;f.nRamp=r.nRamp;
+}
+function yUnit(st){return st.norm?'熱流 (W/g)':'熱流 (mW)';}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   4. SVG 描画
+   ═══════════════════════════════════════════════════════════════════════ */
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs={},text){
+  const e=document.createElementNS(NS,tag);
+  for(const k in attrs)e.setAttribute(k,attrs[k]);
+  if(text!=null)e.textContent=text;
+  return e;
+}
+function niceTicks(lo,hi,n){
+  if(!(hi>lo))return [lo];
+  const span=hi-lo;
+  let step=Math.pow(10,Math.floor(Math.log10(span/n)));
+  for(const m of [1,2,2.5,5,10]){if(span/(step*m)<=n){step*=m;break;}}
+  const out=[];let s=Math.ceil(lo/step)*step;
+  while(s<=hi+1e-9){out.push(+s.toPrecision(12));s+=step;}
+  return out;
+}
+function decim(i0,i1,maxPts){
+  const n=i1-i0+1;return Math.max(1,Math.floor(n/maxPts));
+}
+
+function buildSvg(){
+  const st=S();
+  if(!FILES.length)return null;
+
+  const cols=Math.max(1,Math.min(st.cols,FILES.length));
+  const rows=Math.ceil(FILES.length/cols);
+  const M={l:66,r:26,t:30,b:46};
+  const pw=st.pw,ph=st.ph;
+  const gapX=18,gapY=26;
+  const titleH=st.title?34:10;
+  const W=M.l+cols*pw+(cols-1)*gapX+M.r;
+  const H=titleH+rows*ph+(rows-1)*gapY+M.b+10;
+
+  const FF="'Noto Sans JP','Hiragino Sans','Yu Gothic',Meiryo,sans-serif";
+  const MF="'IBM Plex Mono','SFMono-Regular',Consolas,monospace";
+  const svg=el('svg',{xmlns:NS,viewBox:`0 0 ${W} ${H}`,width:W,height:H,'font-family':FF});
+  svg.appendChild(el('rect',{x:0,y:0,width:W,height:H,fill:'#ffffff'}));
+  if(st.title)
+    svg.appendChild(el('text',{x:14,y:24,'font-size':16,fill:INK,'font-weight':500},st.title));
+
+  // ── 全パネル共通のデータ範囲 ──
+  const series=FILES.map(f=>seriesFor(f,st));
+  let xlo=Infinity,xhi=-Infinity,ylo=Infinity,yhi=-Infinity;
+  for(const S2 of series)for(const s of S2.lines){
+    for(let k=0;k<s.x.length;k++){
+      if(s.x[k]<xlo)xlo=s.x[k]; if(s.x[k]>xhi)xhi=s.x[k];
+      if(s.y[k]<ylo)ylo=s.y[k]; if(s.y[k]>yhi)yhi=s.y[k];
+    }
+  }
+  if(!isFinite(xlo)){xlo=0;xhi=1;ylo=0;yhi=1;}
+  if(!st.xAuto){if(st.xMin!=null)xlo=st.xMin;if(st.xMax!=null)xhi=st.xMax;}
+  if(!st.yAuto){if(st.yMin!=null)ylo=st.yMin;if(st.yMax!=null)yhi=st.yMax;}
+  else{const p=(yhi-ylo)*0.08||1;ylo-=p;yhi+=p;}
+  const px=(xhi-xlo)*0.03||1;
+  if(st.xAuto){xlo-=px;xhi+=px;}
+
+  FILES.forEach((f,idx)=>{
+    const c=idx%cols,r=Math.floor(idx/cols);
+    const ox=M.l+c*(pw+gapX), oy=titleH+r*(ph+gapY);
+    const iw=pw-M.r, ih=ph-M.t-14;
+    const X=v=>ox+(v-xlo)/(xhi-xlo)*iw;
+    const Y=v=>oy+M.t+ih-(v-ylo)/(yhi-ylo)*ih;
+    const G=el('g');
+    // 枠とグリッド
+    G.appendChild(el('rect',{x:ox,y:oy+M.t,width:iw,height:ih,fill:'none',stroke:RULE}));
+    for(const xt of niceTicks(xlo,xhi,5)){
+      if(xt<xlo||xt>xhi)continue;
+      G.appendChild(el('line',{x1:X(xt),y1:oy+M.t,x2:X(xt),y2:oy+M.t+ih,
+                               stroke:RULE,'stroke-dasharray':'1 4'}));
+      G.appendChild(el('text',{x:X(xt),y:oy+M.t+ih+15,'font-size':10,fill:MUT,
+                               'text-anchor':'middle','font-family':MF},fmt(xt)));
+    }
+    const showY=series[idx].yTicks!==false;
+    for(const yt of niceTicks(ylo,yhi,5)){
+      if(yt<ylo||yt>yhi)continue;
+      G.appendChild(el('line',{x1:ox,y1:Y(yt),x2:ox+iw,y2:Y(yt),
+                               stroke:RULE,'stroke-dasharray':'1 4'}));
+      if(showY&&c===0)
+        G.appendChild(el('text',{x:ox-7,y:Y(yt)+3.5,'font-size':10,fill:MUT,'text-anchor':'end',
+                                 'font-family':MF},fmt(yt)));
+    }
+    // 基準線
+    if(series[idx].vAxis==='temp')for(const v of st.vline){
+      if(v>=xlo&&v<=xhi)G.appendChild(el('line',{x1:X(v),y1:oy+M.t,x2:X(v),y2:oy+M.t+ih,
+        stroke:MUT,'stroke-width':.9,'stroke-dasharray':'4 3'}));
+    }
+    if(st.showZero&&series[idx].zeroLine&&ylo<0&&yhi>0)
+      G.appendChild(el('line',{x1:ox,y1:Y(0),x2:ox+iw,y2:Y(0),stroke:MUT,'stroke-width':.7,
+                               'stroke-dasharray':'4 3'}));
+    // 曲線
+    for(const s of series[idx].lines){
+      let d='';
+      for(let k=0;k<s.x.length;k++){
+        if(s.x[k]<xlo-1e9)continue;
+        d+=(k?'L':'M')+X(s.x[k]).toFixed(1)+' '+Y(s.y[k]).toFixed(1)+' ';
+      }
+      G.appendChild(el('path',{d,fill:'none',stroke:s.c,'stroke-width':s.w||1.4,
+                               'stroke-linejoin':'round','stroke-linecap':'round'}));
+      if(s.base!=null)
+        G.appendChild(el('line',{x1:ox,y1:Y(s.base),x2:ox+iw,y2:Y(s.base),stroke:s.c,
+                                 'stroke-width':.5,'stroke-dasharray':'1 4',opacity:.55}));
+    }
+    // ステップ番号
+    if(st.showLab)for(const lb of series[idx].labels){
+      const tx=lb.atRight?ox+iw-4:X(lb.x)+4;
+      G.appendChild(el('text',{x:tx,y:Y(lb.y)+(lb.dy||0),'font-size':10.5,fill:lb.c,
+        'text-anchor':lb.atRight?'end':'start','font-family':MF},
+        lb.text+(st.showArr&&lb.arrow?' '+lb.arrow:'')));
+    }
+    // 見出し
+    G.appendChild(el('text',{x:ox,y:oy+16,'font-size':11.5,fill:INK,'font-weight':500},f.label));
+    if(st.showMass&&f.mass)
+      G.appendChild(el('text',{x:ox+iw,y:oy+16,'font-size':10,fill:MUT,'text-anchor':'end',
+                               'font-family':MF},f.mass.toFixed(1)+' mg'));
+    // スケールバー(段積みのとき)
+    if(series[idx].scaleBar&&idx===0){
+      const v=series[idx].scaleBar;
+      G.appendChild(el('line',{x1:ox+8,y1:Y(ylo+(yhi-ylo)*0.06),x2:ox+8,
+                               y2:Y(ylo+(yhi-ylo)*0.06+v),stroke:INK,'stroke-width':1.8}));
+      G.appendChild(el('text',{x:ox+13,y:Y(ylo+(yhi-ylo)*0.06+v/2)+3,'font-size':10,fill:INK},
+                               v+' '+(st.norm?'W/g':'mW')));
+    }
+    svg.appendChild(G);
+  });
+  // 軸ラベル
+  const s0=series[0];
+  svg.appendChild(el('text',{x:W/2,y:H-8,'font-size':12,fill:MUT,'text-anchor':'middle'},s0.xLab));
+  const cy=titleH+(H-titleH-M.b)/2;
+  svg.appendChild(el('text',{x:16,y:cy,'font-size':12,fill:MUT,'text-anchor':'middle',
+    transform:`rotate(-90 16 ${cy})`},s0.yLab));
+  return svg;
+}
+function fmt(v){
+  if(Math.abs(v)>=1000)return v.toPrecision(4);
+  return (Math.round(v*1000)/1000).toString();
+}
+
+/** ビューごとに描く線・ラベル・軸名を組み立てる */
+function seriesFor(f,st){
+  const lines=[],labels=[];
+  const push=(i0,i1,xarr,yarr,c,w,base)=>{
+    const step=decim(i0,i1,1600);
+    const x=[],y=[];
+    for(let k=i0;k<=i1;k+=step){x.push(xarr[k]);y.push(yarr[k]);}
+    if(x.length)lines.push({x,y,c,w,base});
+  };
+  const trimI=(s)=>{
+    let i0=s.i0;
+    while(i0<s.i1&&f.t[i0]-f.t[s.i0]<st.trim)i0++;
+    return i0;
+  };
+  if(VIEW==='hist'){
+    for(const s of f.segs){
+      if(s.kind===0){if(st.showHold)push(s.i0,s.i1,f.t,f.T,HOLDC,2.4);continue;}
+      const c=colorOf(s,f,st);
+      push(s.i0,s.i1,f.t,f.T,c,1.9);
+      const mid=(s.i0+s.i1)>>1;
+      labels.push({x:f.t[mid],y:f.T[mid],text:s.label,c,arrow:s.kind>0?'↑':'↓',dy:s.kind>0?12:-5});
+    }
+    return {lines,labels,xLab:'時間 (min)',yLab:'試料温度 (°C)',vAxis:'time',zeroLine:false};
+  }
+  if(VIEW==='hft'){
+    for(const s of f.segs){
+      if(s.kind===0){if(st.showHold)push(s.i0,s.i1,f.t,f.hf,HOLDC,1.6);continue;}
+      push(trimI(s),s.i1,f.t,f.hf,colorOf(s,f,st),1.4);
+    }
+    return {lines,labels,xLab:'時間 (min)',yLab:yUnit(st)+' 吸熱↑',vAxis:'time',zeroLine:true};
+  }
+  if(VIEW==='hfT'){
+    for(const s of f.segs){
+      if(s.kind===0)continue;
+      const c=colorOf(s,f,st);
+      push(trimI(s),s.i1,f.T,f.hf,c,1.4);
+      labels.push({atRight:true,y:f.hf[s.i1],text:s.label,c,arrow:s.kind>0?'→':'←',dy:-4});
+    }
+    return {lines,labels,xLab:'試料温度 (°C)',yLab:yUnit(st)+' 吸熱↑',vAxis:'temp',zeroLine:true};
+  }
+  if(VIEW==='hfTo'){
+    const ramps=f.segs.filter(s=>s.kind!==0);
+    const off=offsets(f,st,ramps);
+    for(let k=0;k<ramps.length;k++){
+      const s=ramps[k],c=colorOf(s,f,st),o=off[k];
+      const i0=trimI(s),step=decim(i0,s.i1,1600);
+      const x=[],y=[];
+      for(let i=i0;i<=s.i1;i+=step){x.push(f.T[i]);y.push(f.hf[i]+o);}
+      lines.push({x,y,c,w:1.4,base:o});
+      labels.push({atRight:true,y:o,text:s.label,c,arrow:s.kind>0?'→':'←',dy:-4});
+    }
+    return {lines,labels,xLab:'試料温度 (°C)',yLab:'熱流(ステップごとにオフセット) 吸熱↑',
+            vAxis:'temp',zeroLine:false,yTicks:false,scaleBar:st.norm?0.5:2};
+  }
+  // hold
+  for(const s of f.segs){
+    if(s.kind!==0)continue;
+    const i0=trimI(s),step=decim(i0,s.i1,1600);
+    const x=[],y=[];
+    for(let i=i0;i<=s.i1;i+=step){x.push(f.t[i]-f.t[s.i0]);y.push(f.hf[i]);}
+    const c=PAL[(s.holdIdx+1)%PAL.length];
+    lines.push({x,y,c,w:1.5});
+    if(x.length)labels.push({x:x[x.length-1],y:y[y.length-1],text:Math.round(s.T0)+'°C',c,dy:-4});
+  }
+  return {lines,labels,xLab:'保持開始からの時間 (min)',yLab:yUnit(st)+' 吸熱↑',
+          vAxis:'time',zeroLine:true};
+}
+/** 段積みのオフセット。末尾のランプを 0 に置き、衝突しない高さに積む */
+let GLOBAL_OFF=null;
+function offsets(f,st,ramps){
+  if(GLOBAL_OFF)return ramps.map(s=>GLOBAL_OFF[st.anchor==='end'?s.fromEnd:s.rampIdx]||0);
+  return ramps.map(()=>0);
+}
+function computeGlobalOffsets(st){
+  // すべてのファイルを通して、同じ段には同じ高さを与える
+  const ext={};                      // key → {min,max}
+  for(const f of FILES){
+    for(const s of f.segs){
+      if(s.kind===0)continue;
+      const key=st.anchor==='end'?s.fromEnd:s.rampIdx;
+      let lo=Infinity,hi=-Infinity;
+      let i0=s.i0;while(i0<s.i1&&f.t[i0]-f.t[s.i0]<st.trim)i0++;
+      for(let i=i0;i<=s.i1;i++){if(f.hf[i]<lo)lo=f.hf[i];if(f.hf[i]>hi)hi=f.hf[i];}
+      if(!ext[key])ext[key]={min:lo,max:hi};
+      else{ext[key].min=Math.min(ext[key].min,lo);ext[key].max=Math.max(ext[key].max,hi);}
+    }
+  }
+  const keys=Object.keys(ext).map(Number).sort((a,b)=>a-b);
+  const off={};let cursor=0;
+  const gap=(()=>{let span=0;for(const k of keys)span=Math.max(span,ext[k].max-ext[k].min);
+                  return Math.max(span*0.12,0.03);})();
+  for(const k of keys){                       // k=0 が最下段
+    off[k]=cursor-ext[k].min;
+    cursor=off[k]+ext[k].max+gap;
+  }
+  GLOBAL_OFF=off;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   5. 画面
+   ═══════════════════════════════════════════════════════════════════════ */
+function render(){
+  const host=g('svgHost');
+  host.innerHTML='';
+  if(!FILES.length){
+    host.innerHTML='<p class="empty">左のパネルにファイルをドロップしてください。<br>島津の .tad はそのまま読めます。</p>';
+    g('tableHost').innerHTML='';return;
+  }
+  const st=S();
+  GLOBAL_OFF=null;
+  FILES.forEach(f=>prep(f,st));
+  if(VIEW==='hfTo')computeGlobalOffsets(st);
+  const svg=buildSvg();
+  if(svg)host.appendChild(svg);
+  renderTable(st);
+}
+function renderTable(st){
+  let h='<div class="scroll"><table class="tbl"><tr><th>測定</th><th>試料</th><th>質量 mg</th>'
+      +'<th>段</th><th>種別</th><th>T 開始</th><th>T 終了</th><th>速度 K/min</th><th>長さ min</th>'
+      +'<th>主ピーク T</th><th>ΔH</th></tr>';
+  for(const f of FILES){
+    for(const s of f.segs){
+      const y=f.hf,t=f.t,T=f.T;
+      let i0=s.i0;while(i0<s.i1&&t[i0]-t[s.i0]<st.trim)i0++;
+      const pk=peaks(t.slice(i0,s.i1+1),T.slice(i0,s.i1+1),y.slice(i0,s.i1+1),{});
+      const p=pk[0];
+      h+=`<tr><td>${esc(f.label)}</td><td>${esc(f.sample||'')}</td>`
+       +`<td>${f.mass?f.mass.toFixed(1):'—'}</td><td>${s.label||'hold'}</td>`
+       +`<td>${s.kind>0?'昇温':s.kind<0?'降温':'保持'}</td>`
+       +`<td>${s.T0.toFixed(1)}</td><td>${s.T1.toFixed(1)}</td>`
+       +`<td>${s.kind===0?'—':s.rate.toFixed(2)}</td><td>${(s.t1-s.t0).toFixed(1)}</td>`
+       +`<td>${p?p.Tpeak.toFixed(2):'—'}</td>`
+       +`<td>${p?(p.dir==='exo'?'−':'')+Math.abs(p.dH).toFixed(1):'—'}</td></tr>`;
+    }
+  }
+  h+='</table></div><p class="note">ΔH は直線ベースラインの自動積分(規格化時 J/g)。符号は発熱が −。傾向の比較用です。</p>';
+  g('tableHost').innerHTML=h;
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function renderFileList(){
+  const box=g('fileList');box.innerHTML='';
+  FILES.forEach((f,i)=>{
+    const d=document.createElement('div');
+    d.className='fitem';d.draggable=true;d.dataset.i=i;
+    d.innerHTML=`<span class="hd">⠿</span><span class="nm"><input value="${esc(f.label)}"></span><span class="x">✕</span>`;
+    d.querySelector('input').addEventListener('input',e=>{f.label=e.target.value;render();});
+    d.querySelector('input').addEventListener('mousedown',e=>{d.draggable=false;});
+    d.querySelector('input').addEventListener('blur',e=>{d.draggable=true;});
+    d.querySelector('.x').addEventListener('click',()=>{FILES.splice(i,1);renderFileList();render();});
+    d.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',i);d.classList.add('drag');});
+    d.addEventListener('dragend',()=>d.classList.remove('drag'));
+    d.addEventListener('dragover',e=>e.preventDefault());
+    d.addEventListener('drop',e=>{
+      e.preventDefault();e.stopPropagation();
+      const from=+e.dataTransfer.getData('text/plain');
+      if(isNaN(from)||from===i)return;
+      const [m]=FILES.splice(from,1);FILES.splice(i,0,m);
+      renderFileList();render();
+    });
+    box.appendChild(d);
+  });
+}
+function toast(msg,ms=2600){
+  const t=g('toast');t.textContent=msg;t.classList.add('on');
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),ms);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   6. 読み込み
+   ═══════════════════════════════════════════════════════════════════════ */
+let UID=0;
+function addFiles(list){
+  const arr=Array.from(list);
+  let done=0,ok=0;
+  arr.forEach(file=>{
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const buf=r.result;
+        const txt=isTadBuffer(buf)?tadToText(buf,file.name):decodeDscBytes(buf);
+        const p=parseDscRawText(txt,file.name);
+        if(!p||!p.rows.length)throw new Error('データ行を読めませんでした');
+        const base=file.name.replace(/\.[^.]+$/,'');
+        FILES.push({id:++UID,name:file.name,label:base,meta:p.meta,rows:p.rows,
+                    mass:massOf(p.meta),sample:sampleOf(p.meta),date:dateOf(p.meta),
+                    vendor:p.vendor,methodSteps:p.methodSteps});
+        ok++;
+      }catch(e){toast(`${file.name}: ${e.message}`,4200);}
+      if(++done===arr.length){
+        FILES.sort((a,b)=>a.id-b.id);
+        renderFileList();render();
+        if(ok)toast(`${ok} 件読み込みました`);
+      }
+    };
+    r.onerror=()=>{toast(`${file.name}: 読み込みに失敗`);if(++done===arr.length){renderFileList();render();}};
+    r.readAsArrayBuffer(file);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   7. 書き出し
+   ═══════════════════════════════════════════════════════════════════════ */
+function svgText(){
+  const svg=g('svgHost').querySelector('svg');
+  if(!svg){toast('図がありません');return null;}
+  const c=svg.cloneNode(true);
+  c.setAttribute('xmlns',NS);
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(c);
+}
+function dl(name,blob){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+function stamp(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+}
+function baseName(){
+  const t=S().title.replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,40);
+  return (t||'dsc_panel')+'_'+VIEW+'_'+stamp();
+}
+g('expSvg').onclick=()=>{
+  const s=svgText();if(!s)return;
+  dl(baseName()+'.svg',new Blob([s],{type:'image/svg+xml'}));
+};
+g('expPng').onclick=()=>{
+  const s=svgText();if(!s)return;
+  const svg=g('svgHost').querySelector('svg');
+  const w=+svg.getAttribute('width'),h=+svg.getAttribute('height'),scale=3;
+  const img=new Image();
+  const url=URL.createObjectURL(new Blob([s],{type:'image/svg+xml;charset=utf-8'}));
+  img.onload=()=>{
+    const cv=document.createElement('canvas');cv.width=w*scale;cv.height=h*scale;
+    const ctx=cv.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.setTransform(scale,0,0,scale,0,0);
+    ctx.drawImage(img,0,0);
+    URL.revokeObjectURL(url);
+    cv.toBlob(b=>dl(baseName()+'.png',b),'image/png');
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);toast('PNG 変換に失敗しました。SVG で保存してください');};
+  img.src=url;
+};
+function csv(rows){
+  const q=v=>{const s=v==null?'':String(v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  return '\uFEFF'+rows.map(r=>r.map(q).join(',')).join('\r\n');
+}
+g('expCsvSeg').onclick=()=>{
+  if(!FILES.length)return toast('ファイルがありません');
+  const st=S();const out=[['file','label','sample','mass_mg','date','vendor','step','type',
+    'T_start_C','T_end_C','rate_K_min','duration_min']];
+  for(const f of FILES)for(const s of f.segs)
+    out.push([f.name,f.label,f.sample,f.mass??'',f.date,f.vendor,s.label||'hold',
+      s.kind>0?'heating':s.kind<0?'cooling':'isothermal',
+      s.T0.toFixed(2),s.T1.toFixed(2),s.kind===0?'':s.rate.toFixed(3),(s.t1-s.t0).toFixed(2)]);
+  dl('dsc_ledger_'+stamp()+'.csv',new Blob([csv(out)],{type:'text/csv'}));
+};
+g('expCsvPk').onclick=()=>{
+  if(!FILES.length)return toast('ファイルがありません');
+  const st=S();
+  const out=[['file','label','mass_mg','step','type','direction','T_onset_C','T_peak_C','T_end_C',
+    'dH_'+(st.norm?'J_per_g':'mW_min'),'normalised','endo_up']];
+  for(const f of FILES)for(const s of f.segs){
+    let i0=s.i0;while(i0<s.i1&&f.t[i0]-f.t[s.i0]<st.trim)i0++;
+    const pk=peaks(f.t.slice(i0,s.i1+1),f.T.slice(i0,s.i1+1),f.hf.slice(i0,s.i1+1),{});
+    for(const p of pk)
+      out.push([f.name,f.label,f.mass??'',s.label||'hold',
+        s.kind>0?'heating':s.kind<0?'cooling':'isothermal',p.dir,
+        p.Tonset.toFixed(2),p.Tpeak.toFixed(2),p.Tend.toFixed(2),p.dH.toFixed(2),
+        st.norm?'yes':'no',st.endoUp?'yes':'no']);
+  }
+  dl('dsc_peaks_'+stamp()+'.csv',new Blob([csv(out)],{type:'text/csv'}));
+};
+g('expCsvData').onclick=()=>{
+  if(!FILES.length)return toast('ファイルがありません');
+  const st=S();
+  const out=[['file','label','step','type','time_min','temp_C',st.norm?'heatflow_W_per_g':'heatflow_mW']];
+  for(const f of FILES)for(const s of f.segs){
+    const step=decim(s.i0,s.i1,3000);
+    for(let i=s.i0;i<=s.i1;i+=step)
+      out.push([f.name,f.label,s.label||'hold',
+        s.kind>0?'heating':s.kind<0?'cooling':'isothermal',
+        f.t[i].toFixed(4),f.T[i].toFixed(3),f.hf[i].toFixed(5)]);
+  }
+  dl('dsc_curves_'+stamp()+'.csv',new Blob([csv(out)],{type:'text/csv'}));
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   8. 配線
+   ═══════════════════════════════════════════════════════════════════════ */
+(function tabs(){
+  const box=g('tabs');
+  VIEWS.forEach(([k,label])=>{
+    const b=document.createElement('button');
+    b.className='tab'+(k===VIEW?' on':'');b.textContent=label;b.dataset.k=k;
+    b.onclick=()=>{VIEW=k;[...box.children].forEach(c=>c.classList.toggle('on',c.dataset.k===k));render();};
+    box.appendChild(b);
+  });
+})();
+const drop=g('drop'),fileIn=g('fileIn');
+drop.onclick=()=>fileIn.click();
+fileIn.onchange=e=>{addFiles(e.target.files);fileIn.value='';};
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length)addFiles(e.dataTransfer.files);});
+window.addEventListener('dragover',e=>e.preventDefault());
+window.addEventListener('drop',e=>{
+  if(e.target.closest('.fitem'))return;
+  e.preventDefault();
+  if(e.dataTransfer&&e.dataTransfer.files.length)addFiles(e.dataTransfer.files);
+});
+['cols','pw','ph','title','norm','endoUp','smooth','rateThr','minDur','trim','anchor',
+ 'xAuto','xMin','xMax','yAuto','yMin','yMax','vline','showLab','showArr','showHold',
+ 'showMass','showZero'].forEach(id=>{
+  const e=g(id);
+  e.addEventListener(e.type==='checkbox'||e.tagName==='SELECT'?'change':'input',()=>render());
+});
+g('manBtn').onclick=()=>g('ovl').classList.add('on');
+g('manClose').onclick=()=>g('ovl').classList.remove('on');
+g('ovl').addEventListener('click',e=>{if(e.target===g('ovl'))g('ovl').classList.remove('on');});
+window.addEventListener('keydown',e=>{if(e.key==='Escape')g('ovl').classList.remove('on');});
+g('themeBtn').onclick=()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme',cur==='dark'?'light':'dark');
+};
+</script>
 </body>
 </html>
