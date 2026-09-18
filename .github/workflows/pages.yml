@@ -2,7 +2,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - claude/dsc-tools-github-pages-0kmowc  # 現在のデフォルトブランチ。main にリネームしたら削除可
   workflow_dispatch:
 
 permissions:

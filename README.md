@@ -25,7 +25,7 @@ git add -A && git commit -m "Add dsc-panel-grid, skill, and overview" && git pus
 
 ## GitHub Pages の有効化（初回のみ、Web UI で）
 
-1. リポジトリの **Settings → Pages** を開く
+1. リポジトリの **Settings → Pages** を開く（設定済み）
 2. **Build and deployment → Source** を **GitHub Actions** にする
 3. `main` に push する（または Actions タブから `Deploy to GitHub Pages` を手動実行）
 
