@@ -1,32 +1,28 @@
 # dsc-tools
 
-DSC パネルグリッド（`dsc-panel-grid.html`）を GitHub Pages で公開するリポジトリ。
+DSC 測定ファイル(島津 .tad / .txt、PerkinElmer Pyris .txt)をブラウザ上でパネル図と CSV にするツール「DSC Panel Grid」を GitHub Pages で公開するリポジトリ。
+
+公開 URL: https://keisuke0502watanabe.github.io/dsc-tools/
 
 ## 構成
 
 | 置き場所 | 内容 |
 | --- | --- |
-| `index.html` | `dsc-panel-grid.html` をリネームしたもの（Pages のトップ） |
-| `.claude/skills/dsc-panel-grid/SKILL.md` | Claude Code 用スキル |
-| `docs/overview.md` | 概要ドキュメント |
-| `.github/workflows/pages.yml` | `main` への push で Pages にデプロイ |
+| `index.html` | DSC Panel Grid 本体(単一 HTML) |
+| `docs/overview.md` | ツールの概要、入力形式、処理の流れ、出力、注意点 |
+| `.claude/skills/dsc-panel-grid/SKILL.md` | Claude Code 用スキル。使い方の案内と CSV 集計の手順 |
+| `.github/workflows/pages.yml` | push で GitHub Pages に自動デプロイ |
 
-## 元ファイルの取り込み（Mac 側で実行）
+## 更新のしかた
+
+`index.html` を書き換えて push すれば、GitHub Actions が 1 分ほどで公開ページを更新する。
 
 ```sh
-cd /path/to/dsc-tools
-SRC=/Users/keisukemac/katsumoto_lab/sumitani/ToSumitani_from
-cp "$SRC/dsc-panel-grid.html" index.html
-cp "$SRC/SKILL.md" .claude/skills/dsc-panel-grid/SKILL.md
-cp "$SRC/overview.md" docs/overview.md
-rm .claude/skills/dsc-panel-grid/README.md docs/README.md
-git add -A && git commit -m "Add dsc-panel-grid, skill, and overview" && git push
+git pull
+cp /path/to/dsc-panel-grid.html index.html
+git add -A && git commit -m "Update dsc-panel-grid" && git push
 ```
 
-## GitHub Pages の有効化（初回のみ、Web UI で）
+## Pages の設定
 
-1. リポジトリの **Settings → Pages** を開く（設定済み）
-2. **Build and deployment → Source** を **GitHub Actions** にする
-3. `main` に push する（または Actions タブから `Deploy to GitHub Pages` を手動実行）
-
-公開 URL: https://keisuke0502watanabe.github.io/dsc-tools/
+Settings → Pages → Build and deployment → Source を「GitHub Actions」にしてある。ブランチを `main` にリネームした場合は、`.github/workflows/pages.yml` のトリガーから旧ブランチ名の行を削除してよい。
